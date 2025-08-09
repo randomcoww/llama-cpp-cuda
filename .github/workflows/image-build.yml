@@ -37,8 +37,7 @@ jobs:
         EOF
 
         /kaniko/executor \
-          --context-sub-path=".devops" \
-          --dockerfile="./cuda.Dockerfile" \
+          --dockerfile="./.devops/cuda.Dockerfile" \
           --context="git://github.com/ggml-org/llama.cpp#master" \
           --destination="ghcr.io/${{ github.repository }}:v$CUDA_VERSION.$TAG" \
           --build-arg CUDA_VERSION=$CUDA_VERSION \
