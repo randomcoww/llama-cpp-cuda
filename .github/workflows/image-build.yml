@@ -41,6 +41,7 @@ jobs:
           --context="git://github.com/ggml-org/llama.cpp#master" \
           --destination="ghcr.io/${{ github.repository }}:v$CUDA_VERSION.$TAG" \
           --build-arg CUDA_VERSION=$CUDA_VERSION \
+          --skip-unused-stages \
           --target server \
           --push-retry 3
   cleanup:
