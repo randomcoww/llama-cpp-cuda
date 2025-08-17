@@ -89,8 +89,6 @@ jobs:
           --context="${{ github.repositoryUrl }}#${{ github.ref }}#${{ github.sha }}" \
           --destination="ghcr.io/${{ github.repository }}:v$CUDA_VERSION.${{needs.tag.outputs.timestamp}}-llama-swap" \
           --build-arg BASE_IMAGE=ghcr.io/${{ github.repository }}:v$CUDA_VERSION.${{needs.tag.outputs.timestamp}} \
-          --skip-unused-stages \
-          --target server \
           --push-retry 3
   cleanup:
     needs:
