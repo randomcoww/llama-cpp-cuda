@@ -4,12 +4,17 @@
 
 name: Image Build
 on:
+  workflow_dispatch:
+  - cron: "0 23 1 * *"
   push:
-    tags:
-    - "*"
+    paths-ignore:
+    - .github/**
+    - README.md
+    branches:
+    - master
 
 env:
-  CUDA_VERSION: ${{ github.head_ref || github.ref_name }}
+  CUDA_VERSION: 12.9.1
 
 jobs:
   tag:
