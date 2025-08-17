@@ -12,7 +12,20 @@ env:
   CUDA_VERSION: ${{ github.head_ref || github.ref_name }}
 
 jobs:
+  tag:
+    runs-on: arc-runner-${{ github.event.repository.name }}
+    container:
+      image: docker.io/library/busybox:latest
+    outputs:
+      timestamp: ${{ steps.tag.outputs.TAG }}
+    steps:
+    - name: Set tag
+      id: tag
+      run: |
+        echo TAG=$(date -u +'%Y%m%d.%H%M') | tee -a "$GITHUB_OUTPUT"
   build:
+    needs:
+      - tag
     runs-on: arc-runner-${{ github.event.repository.name }}
     container:
       image: ghcr.io/randomcoww/kaniko:debug
@@ -20,10 +33,6 @@ jobs:
       contents: read
       packages: write
     steps:
-    - name: Set tag
-      run: |
-        echo TAG=$(date -u +'%Y%m%d.%H%M') | tee -a "$GITHUB_ENV"
-
     - name: Build and release container
       run: |
         mkdir -p $DOCKER_CONFIG
@@ -40,15 +49,47 @@ jobs:
         /kaniko/executor \
           --dockerfile="./.devops/cuda.Dockerfile" \
           --context="git://github.com/ggml-org/llama.cpp#master" \
-          --destination="ghcr.io/${{ github.repository }}:v$CUDA_VERSION.$TAG" \
+          --destination="ghcr.io/${{ github.repository }}:v$CUDA_VERSION.${{needs.tag.outputs.timestamp}}" \
           --build-arg CUDA_VERSION=$CUDA_VERSION \
           --skip-unused-stages \
           --target server \
-          --cache \
+          --push-retry 3
+  build-llama-swap:
+    needs:
+      - tag
+      - build
+    runs-on: arc-runner-${{ github.event.repository.name }}
+    container:
+      image: ghcr.io/randomcoww/kaniko:debug
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: Build and release container
+      run: |
+        mkdir -p $DOCKER_CONFIG
+        cat > $DOCKER_CONFIG/config.json <<EOF
+        {
+          "auths": {
+            "ghcr.io": {
+              "auth": "$(echo -n ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} | base64 -w0)"
+            }
+          }
+        }
+        EOF
+
+        /kaniko/executor \
+          --dockerfile="llama-swap.Containerfile" \
+          --context="${{ github.repositoryUrl }}#${{ github.ref }}#${{ github.sha }}" \
+          --destination="ghcr.io/${{ github.repository }}:v$CUDA_VERSION.${{needs.tag.outputs.timestamp}}-llama-swap" \
+          --build-arg BASE_IMAGE=ghcr.io/${{ github.repository }}:v$CUDA_VERSION.${{needs.tag.outputs.timestamp}} \
+          --skip-unused-stages \
+          --target server \
           --push-retry 3
   cleanup:
     needs:
       - build
+      - build-llama-swap
     runs-on: arc-runner-${{ github.event.repository.name }}
     container:
       image: docker.io/node:current-alpine
@@ -60,5 +101,5 @@ jobs:
         with:
           package-name: ${{ github.event.repository.name }}
           package-type: container
-          min-versions-to-keep: 4
+          min-versions-to-keep: 6
           token: ${{ secrets.GITHUB_TOKEN }}
