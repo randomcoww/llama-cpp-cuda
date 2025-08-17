@@ -2,7 +2,7 @@
 # https://some-natalie.dev/blog/kaniko-in-arc/
 # https://dev.to/ipo/using-kaniko-to-build-and-publish-container-image-with-github-action-on-github-self-hosted-runners-d5m
 
-name: Image Build
+name: Add llama-swap
 on:
   workflow_dispatch:
 
@@ -11,8 +11,6 @@ env:
 
 jobs:
   build-llama-swap:
-    needs:
-      - tag
     runs-on: arc-runner-${{ github.event.repository.name }}
     container:
       image: ghcr.io/randomcoww/kaniko:debug
