@@ -3,6 +3,7 @@ FROM $BASE_IMAGE
 
 WORKDIR /app
 
+SHELL ["/usr/bin/bash", "-c"]
 RUN set -x \
   \
   && TARGETARCH=$(arch) \
