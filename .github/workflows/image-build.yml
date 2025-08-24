@@ -55,7 +55,7 @@ jobs:
         /kaniko/executor \
           --dockerfile="./.devops/cuda.Dockerfile" \
           --context="git://github.com/ggml-org/llama.cpp#master" \
-          --destination="ghcr.io/${{ github.repository }}:v$CUDA_VERSION.${{needs.tag.outputs.timestamp}}" \
+          --destination="ghcr.io/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION" \
           --build-arg CUDA_VERSION=$CUDA_VERSION \
           --skip-unused-stages \
           --target server \
@@ -87,8 +87,8 @@ jobs:
         /kaniko/executor \
           --dockerfile="llama-swap.Containerfile" \
           --context="${{ github.repositoryUrl }}#${{ github.ref }}#${{ github.sha }}" \
-          --destination="ghcr.io/${{ github.repository }}:v$CUDA_VERSION.${{needs.tag.outputs.timestamp}}-llama-swap" \
-          --build-arg BASE_IMAGE=ghcr.io/${{ github.repository }}:v$CUDA_VERSION.${{needs.tag.outputs.timestamp}} \
+          --destination="ghcr.io/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION-llama-swap" \
+          --build-arg BASE_IMAGE=ghcr.io/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION \
           --push-retry 3
   cleanup:
     needs:
