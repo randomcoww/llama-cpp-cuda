@@ -20,4 +20,4 @@ RUN set -x \
   && tar xzf llama_swap.tar.gz llama-swap \
   && rm llama_swap.tar.gz
 
-ENTRYPOINT [ "/tini" "--" ]
+ENTRYPOINT ["/tini", "--"]
