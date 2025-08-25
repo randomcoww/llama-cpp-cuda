@@ -51,11 +51,13 @@ jobs:
           }
         }
         EOF
+        echo -e "$INTERNAL_CA_CERT" > $DOCKER_CONFIG/internal.crt
 
         /kaniko/executor \
           --dockerfile="./.devops/cuda.Dockerfile" \
           --context="git://github.com/ggml-org/llama.cpp#master" \
-          --destination="ghcr.io/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION" \
+          --destination="$INTERNAL_REGISTRY/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION" \
+          --registry-certificate=$INTERNAL_REGISTRY=$DOCKER_CONFIG/internal.crt \
           --build-arg CUDA_VERSION=$CUDA_VERSION \
           --skip-unused-stages \
           --target server \
@@ -74,36 +76,29 @@ jobs:
     - name: Build and release container
       run: |
         mkdir -p $DOCKER_CONFIG
-        cat > $DOCKER_CONFIG/config.json <<EOF
-        {
-          "auths": {
-            "ghcr.io": {
-              "auth": "$(echo -n ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} | base64 -w0)"
-            }
-          }
-        }
-        EOF
+        echo -e "$INTERNAL_CA_CERT" > $DOCKER_CONFIG/internal.crt
 
         /kaniko/executor \
           --dockerfile="llama-swap.Containerfile" \
           --context="${{ github.repositoryUrl }}#${{ github.ref }}#${{ github.sha }}" \
-          --destination="ghcr.io/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION-llama-swap" \
-          --build-arg BASE_IMAGE=ghcr.io/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION \
+          --destination="$INTERNAL_REGISTRY/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION-llama-swap" \
+          --registry-certificate=$INTERNAL_REGISTRY=$DOCKER_CONFIG/internal.crt \
+          --build-arg BASE_IMAGE=$INTERNAL_REGISTRY/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION \
           --push-retry 3
-  cleanup:
-    needs:
-      - build
-      - build-llama-swap
-    runs-on: arc-runner-${{ github.event.repository.name }}
-    container:
-      image: docker.io/node:current-alpine
-    permissions:
-      packages: write
-    steps:
-      - name: Remove old container images
-        uses: actions/delete-package-versions@v5
-        with:
-          package-name: ${{ github.event.repository.name }}
-          package-type: container
-          min-versions-to-keep: 6
-          token: ${{ secrets.GITHUB_TOKEN }}
+  # cleanup:
+  #   needs:
+  #     - build
+  #     - build-llama-swap
+  #   runs-on: arc-runner-${{ github.event.repository.name }}
+  #   container:
+  #     image: docker.io/node:current-alpine
+  #   permissions:
+  #     packages: write
+  #   steps:
+  #     - name: Remove old container images
+  #       uses: actions/delete-package-versions@v5
+  #       with:
+  #         package-name: ${{ github.event.repository.name }}
+  #         package-type: container
+  #         min-versions-to-keep: 6
+  #         token: ${{ secrets.GITHUB_TOKEN }}
