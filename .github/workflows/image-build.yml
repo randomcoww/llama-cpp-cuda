@@ -63,6 +63,22 @@ jobs:
           --skip-unused-stages \
           --target server \
           --push-retry 3
+  cleanup:
+    needs:
+      - build
+    runs-on: arc-runner-${{ github.event.repository.name }}
+    container:
+      image: docker.io/node:current-alpine
+    permissions:
+      packages: write
+    steps:
+      - name: Remove old container images
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ github.event.repository.name }}
+          package-type: container
+          min-versions-to-keep: 4
+          token: ${{ secrets.GITHUB_TOKEN }}
   build-llama-swap:
     needs:
       - tag
@@ -90,12 +106,11 @@ jobs:
         /kaniko/executor \
           --dockerfile="llama-swap.Containerfile" \
           --context="${{ github.repositoryUrl }}#${{ github.ref }}#${{ github.sha }}" \
-          --destination="ghcr.io/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION-llama-swap" \
+          --destination="ghcr.io/${{ github.repository }}-llama-swap:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION" \
           --build-arg BASE_IMAGE=ghcr.io/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION \
           --push-retry 3
-  cleanup:
+  cleanup-llama-swap:
     needs:
-      - build
       - build-llama-swap
     runs-on: arc-runner-${{ github.event.repository.name }}
     container:
@@ -106,7 +121,7 @@ jobs:
       - name: Remove old container images
         uses: actions/delete-package-versions@v5
         with:
-          package-name: ${{ github.event.repository.name }}
+          package-name: ${{ github.event.repository.name }}-llama-swap
           package-type: container
-          min-versions-to-keep: 6
+          min-versions-to-keep: 4
           token: ${{ secrets.GITHUB_TOKEN }}
