@@ -40,7 +40,6 @@ jobs:
       image: ghcr.io/randomcoww/kaniko:debug
     permissions:
       contents: read
-      packages: write
     steps:
     - name: Build and release container
       run: |
@@ -54,31 +53,17 @@ jobs:
           }
         }
         EOF
+        echo -e "$INTERNAL_CA_CERT" > $DOCKER_CONFIG/internal.crt
 
         /kaniko/executor \
           --dockerfile="./.devops/cuda.Dockerfile" \
           --context="git://github.com/ggml-org/llama.cpp#master" \
-          --destination="ghcr.io/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION" \
+          --destination="$INTERNAL_REGISTRY/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION" \
+          --registry-certificate=$INTERNAL_REGISTRY=$DOCKER_CONFIG/internal.crt \
           --build-arg CUDA_VERSION=$CUDA_VERSION \
           --skip-unused-stages \
           --target server \
           --push-retry 3
-  cleanup:
-    needs:
-      - build
-    runs-on: arc-runner-${{ github.event.repository.name }}
-    container:
-      image: docker.io/node:current-alpine
-    permissions:
-      packages: write
-    steps:
-      - name: Remove old container images
-        uses: actions/delete-package-versions@v5
-        with:
-          package-name: ${{ github.event.repository.name }}
-          package-type: container
-          min-versions-to-keep: 4
-          token: ${{ secrets.GITHUB_TOKEN }}
   build-llama-swap:
     needs:
       - tag
@@ -88,7 +73,6 @@ jobs:
       image: ghcr.io/randomcoww/kaniko:debug
     permissions:
       contents: read
-      packages: write
     steps:
     - name: Build and release container
       run: |
@@ -102,26 +86,12 @@ jobs:
           }
         }
         EOF
+        echo -e "$INTERNAL_CA_CERT" > $DOCKER_CONFIG/internal.crt
 
         /kaniko/executor \
           --dockerfile="llama-swap.Containerfile" \
           --context="${{ github.repositoryUrl }}#${{ github.ref }}#${{ github.sha }}" \
-          --destination="ghcr.io/${{ github.repository }}-llama-swap:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION" \
-          --build-arg BASE_IMAGE=ghcr.io/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION \
+          --destination="$INTERNAL_REGISTRY/${{ github.repository }}-llama-swap:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION" \
+          --registry-certificate=$INTERNAL_REGISTRY=$DOCKER_CONFIG/internal.crt \
+          --build-arg BASE_IMAGE=$INTERNAL_REGISTRY/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION \
           --push-retry 3
-  cleanup-llama-swap:
-    needs:
-      - build-llama-swap
-    runs-on: arc-runner-${{ github.event.repository.name }}
-    container:
-      image: docker.io/node:current-alpine
-    permissions:
-      packages: write
-    steps:
-      - name: Remove old container images
-        uses: actions/delete-package-versions@v5
-        with:
-          package-name: ${{ github.event.repository.name }}-llama-swap
-          package-type: container
-          min-versions-to-keep: 4
-          token: ${{ secrets.GITHUB_TOKEN }}
