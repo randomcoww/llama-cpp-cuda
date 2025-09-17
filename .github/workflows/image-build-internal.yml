@@ -32,7 +32,6 @@ jobs:
       image: ghcr.io/randomcoww/kaniko:debug
     permissions:
       contents: read
-      packages: write
     steps:
     - name: Build and release container
       run: |
@@ -66,7 +65,6 @@ jobs:
       image: ghcr.io/randomcoww/kaniko:debug
     permissions:
       contents: read
-      packages: write
     steps:
     - name: Build and release container
       run: |
