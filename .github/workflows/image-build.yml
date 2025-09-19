@@ -17,19 +17,30 @@ concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
 
+env:
+  CUDA_VERSION: 12.9.1
+
 jobs:
+  tag:
+    runs-on: arc-runner-${{ github.event.repository.name }}
+    container:
+      image: docker.io/library/busybox:latest
+    outputs:
+      timestamp: ${{ steps.tag.outputs.TAG }}
+    steps:
+    - name: Set tag
+      id: tag
+      run: |
+        echo TAG=$(date -u +'%Y%m%d.%H%M') | tee -a "$GITHUB_OUTPUT"
   build:
+    needs:
+      - tag
     runs-on: arc-runner-${{ github.event.repository.name }}
     container:
       image: registry.default/randomcoww/kaniko:latest
     permissions:
       contents: read
     steps:
-    - name: Set tag
-      run: |
-        echo VERSION=$(wget -O - https://api.github.com/repos/ggml-org/llama.cpp/releases/latest |grep tag_name | cut -d '"' -f 4 | tr -d 'v') | tee -a "$GITHUB_ENV"
-        echo TAG=$(date -u +'%Y%m%d.%H%M') | tee -a "$GITHUB_ENV"
-
     - name: Build and release container
       run: |
         mkdir -p $DOCKER_CONFIG
@@ -45,11 +56,13 @@ jobs:
         echo -e "$INTERNAL_CA_CERT" > $DOCKER_CONFIG/internal.crt
 
         /kaniko/executor \
-          --dockerfile="./Containerfile" \
-          --context="${{ github.repositoryUrl }}#${{ github.ref }}#${{ github.sha }}" \
-          --destination="$INTERNAL_REGISTRY/${{ github.repository }}:v$TAG-$VERSION" \
+          --dockerfile="./.devops/cuda.Dockerfile" \
+          --context="git://github.com/ggml-org/llama.cpp#master" \
+          --destination="$INTERNAL_REGISTRY/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION" \
           --registry-certificate=$INTERNAL_REGISTRY=$DOCKER_CONFIG/internal.crt \
-          --build-arg BASE_IMAGE=ghcr.io/ggml-org/llama.cpp:server-cuda-$VERSION \
+          --build-arg CUDA_VERSION=$CUDA_VERSION \
+          --skip-unused-stages \
+          --target server \
           --push-retry 3
   cleanup:
     needs:
@@ -71,6 +84,60 @@ jobs:
           if [ "$i" -ge "$TAGS_KEEP" ]; then
             echo "Delete $tag"
             regctl tag delete --ignore-missing $INTERNAL_REGISTRY/${{ github.repository }}:$tag
+          fi
+          i=$((i + 1))
+        done
+  build-llama-swap:
+    needs:
+      - tag
+      - build
+    runs-on: arc-runner-${{ github.event.repository.name }}
+    container:
+      image: registry.default/randomcoww/kaniko:latest
+    permissions:
+      contents: read
+    steps:
+    - name: Build and release container
+      run: |
+        mkdir -p $DOCKER_CONFIG
+        cat > $DOCKER_CONFIG/config.json <<EOF
+        {
+          "auths": {
+            "ghcr.io": {
+              "auth": "$(echo -n ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} | base64 -w0)"
+            }
+          }
+        }
+        EOF
+        echo -e "$INTERNAL_CA_CERT" > $DOCKER_CONFIG/internal.crt
+
+        /kaniko/executor \
+          --dockerfile="llama-swap.Containerfile" \
+          --context="${{ github.repositoryUrl }}#${{ github.ref }}#${{ github.sha }}" \
+          --destination="$INTERNAL_REGISTRY/${{ github.repository }}-llama-swap:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION" \
+          --registry-certificate=$INTERNAL_REGISTRY=$DOCKER_CONFIG/internal.crt \
+          --build-arg BASE_IMAGE=$INTERNAL_REGISTRY/${{ github.repository }}:v${{needs.tag.outputs.timestamp}}-$CUDA_VERSION \
+          --push-retry 3
+  cleanup-llama-swap:
+    needs:
+      - build-llama-swap
+    env:
+      TAGS_KEEP: 4
+    runs-on: arc-runner-${{ github.event.repository.name }}
+    container:
+      image: docker.io/regclient/regctl:alpine
+    steps:
+    - name: Remove old tags
+      run: |
+        set -e
+        regctl registry set $INTERNAL_REGISTRY --cacert "$INTERNAL_CA_CERT"
+        tags=$(regctl tag ls $INTERNAL_REGISTRY/${{ github.repository }}-llama-swap | grep -v latest | sort -r)
+
+        i=0
+        for tag in $tags; do
+          if [ "$i" -ge "$TAGS_KEEP" ]; then
+            echo "Delete $tag"
+            regctl tag delete --ignore-missing $INTERNAL_REGISTRY/${{ github.repository }}-llama-swap:$tag
           fi
           i=$((i + 1))
         done
