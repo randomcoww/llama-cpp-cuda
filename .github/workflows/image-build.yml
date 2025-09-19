@@ -27,6 +27,7 @@ jobs:
     steps:
     - name: Set tag
       run: |
+        echo VERSION=$(wget -O - https://api.github.com/repos/ggml-org/llama.cpp/releases/latest |grep tag_name | cut -d '"' -f 4 | tr -d 'v') | tee -a "$GITHUB_ENV"
         echo TAG=$(date -u +'%Y%m%d.%H%M') | tee -a "$GITHUB_ENV"
 
     - name: Build and release container
@@ -46,9 +47,9 @@ jobs:
         /kaniko/executor \
           --dockerfile="./Containerfile" \
           --context="${{ github.repositoryUrl }}#${{ github.ref }}#${{ github.sha }}" \
-          --destination="$INTERNAL_REGISTRY/${{ github.repository }}:v$TAG" \
+          --destination="$INTERNAL_REGISTRY/${{ github.repository }}:v$TAG-$VERSION" \
           --registry-certificate=$INTERNAL_REGISTRY=$DOCKER_CONFIG/internal.crt \
-          --build-arg BASE_IMAGE=ghcr.io/ggml-org/llama.cpp:server-cuda \
+          --build-arg BASE_IMAGE=ghcr.io/ggml-org/llama.cpp:server-cuda-$VERSION \
           --push-retry 3
   cleanup:
     needs:
