@@ -21,7 +21,7 @@ jobs:
   build:
     runs-on: arc-runner-${{ github.event.repository.name }}
     container:
-      image: registry.default/randomcoww/kaniko:latest
+      image: gcr.io/kaniko-project/executor:debug
     permissions:
       contents: read
     steps:
@@ -49,8 +49,8 @@ jobs:
           --destination="$INTERNAL_REGISTRY/${{ github.repository }}:v$TAG" \
           --registry-certificate=$INTERNAL_REGISTRY=$DOCKER_CONFIG/internal.crt \
           --build-arg BASE_IMAGE=ghcr.io/ggml-org/llama.cpp:server-cuda \
-          --image-fs-extract-retry 6 \
-          --push-retry 6
+          --image-fs-extract-retry=6 \
+          --push-retry=6
   cleanup:
     needs:
       - build
