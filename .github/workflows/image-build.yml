@@ -54,7 +54,8 @@ jobs:
           --snapshot-mode=redo \
           --cleanup \
           --image-fs-extract-retry=6 \
-          --push-retry=6
+          --push-retry=6 \
+          --verbosity=debug
   cleanup:
     needs:
       - build
