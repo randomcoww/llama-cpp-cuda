@@ -56,6 +56,9 @@ jobs:
           --image-download-retry=6 \
           --image-fs-extract-retry=6 \
           --push-retry=6 \
+          --cache=true \
+          --compressed-caching=false \
+          --cache-copy-layers \
           --verbosity=debug
   cleanup:
     needs:
