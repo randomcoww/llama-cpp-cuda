@@ -52,11 +52,7 @@ jobs:
           --use-new-run \
           --skip-unused-stages \
           --snapshot-mode=redo \
-          --cache=true \
-          --cache-dir=/cache \
-          --compressed-caching=false \
           --cleanup \
-          --cache-copy-layers \
           --image-fs-extract-retry=6 \
           --push-retry=6
   cleanup:
@@ -72,7 +68,7 @@ jobs:
       run: |
         set -e
         regctl registry set $INTERNAL_REGISTRY --cacert "$INTERNAL_CA_CERT"
-        tags=$(regctl tag ls $INTERNAL_REGISTRY/${{ github.repository }} | grep -v latest | sort -r)
+        tags=$(regctl tag ls $INTERNAL_REGISTRY/${{ github.repository }} --exclude latest | sort -r)
 
         i=0
         for tag in $tags; do
