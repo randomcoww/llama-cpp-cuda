@@ -53,6 +53,7 @@ jobs:
           --skip-unused-stages \
           --snapshot-mode=redo \
           --cleanup \
+          --image-download-retry=6 \
           --image-fs-extract-retry=6 \
           --push-retry=6 \
           --verbosity=debug
