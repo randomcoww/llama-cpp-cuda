@@ -19,6 +19,7 @@ concurrency:
 
 env:
   FF_KANIKO_SQUASH_STAGES: true # https://github.com/mzihlmann/kaniko/pull/141
+  BASE_IMAGE: ghcr.io/ggml-org/llama.cpp:server-cuda-b6527
 
 jobs:
   build:
@@ -51,7 +52,7 @@ jobs:
           --context="${{ github.repositoryUrl }}#${{ github.ref }}#${{ github.sha }}" \
           --destination="$INTERNAL_REGISTRY/${{ github.repository }}:v$TAG" \
           --registry-certificate=$INTERNAL_REGISTRY=$DOCKER_CONFIG/internal.crt \
-          --build-arg BASE_IMAGE=ghcr.io/ggml-org/llama.cpp:server-cuda \
+          --build-arg BASE_IMAGE=$BASE_IMAGE \
           --use-new-run \
           --skip-unused-stages \
           --snapshot-mode=redo \
