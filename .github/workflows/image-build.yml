@@ -2,7 +2,7 @@
 # https://some-natalie.dev/blog/kaniko-in-arc/
 # https://dev.to/ipo/using-kaniko-to-build-and-publish-container-image-with-github-action-on-github-self-hosted-runners-d5m
 
-name: Image Build
+name: Image build
 on:
   workflow_dispatch:
   schedule:
@@ -17,21 +17,24 @@ concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
 
+env:
+  FF_KANIKO_SQUASH_STAGES: true # https://github.com/mzihlmann/kaniko/pull/141
+
 jobs:
   build:
     runs-on: arc-runner-${{ github.event.repository.name }}
     container:
-      image: gcr.io/kaniko-project/executor:debug
+      image: docker.io/martizih/kaniko:debug
     permissions:
       contents: read
     steps:
     - name: Set tag
       run: |
+        set -e
         echo TAG=$(date -u +'%Y%m%d.%H%M') | tee -a "$GITHUB_ENV"
 
     - name: Build and release container
       run: |
-        mkdir -p $DOCKER_CONFIG
         cat > $DOCKER_CONFIG/config.json <<EOF
         {
           "auths": {
@@ -43,7 +46,7 @@ jobs:
         EOF
         echo -e "$INTERNAL_CA_CERT" > $DOCKER_CONFIG/internal.crt
 
-        /kaniko/executor \
+        executor \
           --dockerfile="./Containerfile" \
           --context="${{ github.repositoryUrl }}#${{ github.ref }}#${{ github.sha }}" \
           --destination="$INTERNAL_REGISTRY/${{ github.repository }}:v$TAG" \
@@ -69,10 +72,8 @@ jobs:
       run: |
         set -e
         regctl registry set $INTERNAL_REGISTRY --cacert "$INTERNAL_CA_CERT"
-        tags=$(regctl tag ls $INTERNAL_REGISTRY/${{ github.repository }} --exclude latest | sort -r)
-
         i=0
-        for tag in $tags; do
+        for tag in $(regctl tag ls $INTERNAL_REGISTRY/${{ github.repository }} --exclude latest | sort -r); do
           if [ "$i" -ge "$TAGS_KEEP" ]; then
             echo "Delete $tag"
             regctl tag delete --ignore-missing $INTERNAL_REGISTRY/${{ github.repository }}:$tag
